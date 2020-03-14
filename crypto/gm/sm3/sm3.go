@@ -22,7 +22,7 @@ var gT = []uint32{
 	0x9D8A7A87, 0x3B14F50F, 0x7629EA1E, 0xEC53D43C, 0xD8A7A879, 0xB14F50F3, 0x629EA1E7, 0xC53D43CE,
 	0x8A7A879D, 0x14F50F3B, 0x29EA1E76, 0x53D43CEC, 0xA7A879D8, 0x4F50F3B1, 0x9EA1E762, 0x3D43CEC5}
 
-type sm3Digest struct {
+type Sm3Digest struct {
 	v         [DigestLength / 4]uint32
 	inWords   [BlockSize]uint32
 	xOff      int32
@@ -33,19 +33,19 @@ type sm3Digest struct {
 }
 
 func New() hash.Hash {
-	digest := new(sm3Digest)
+	digest := new(Sm3Digest)
 	digest.Reset()
 	return digest
 }
 
-func (digest *sm3Digest) Sum(b []byte) []byte {
+func (digest *Sm3Digest) Sum(b []byte) []byte {
 	d1 := digest
 	h := d1.checkSum()
 	return append(b, h[:]...)
 }
 
 // Size returns the number of bytes Sum will return.
-func (digest *sm3Digest) Size() int {
+func (digest *Sm3Digest) Size() int {
 	return DigestLength
 }
 
@@ -53,11 +53,11 @@ func (digest *sm3Digest) Size() int {
 // The Write method must be able to accept any amount
 // of data, but it may operate more efficiently if all writes
 // are a multiple of the block size.
-func (digest *sm3Digest) BlockSize() int {
+func (digest *Sm3Digest) BlockSize() int {
 	return BlockSize
 }
 
-func (digest *sm3Digest) Reset() {
+func (digest *Sm3Digest) Reset() {
 	digest.byteCount = 0
 
 	digest.xBufOff = 0
@@ -85,7 +85,7 @@ func (digest *sm3Digest) Reset() {
 	digest.xOff = 0
 }
 
-func (digest *sm3Digest) Write(p []byte) (n int, err error) {
+func (digest *Sm3Digest) Write(p []byte) (n int, err error) {
 	_ = p[0]
 	inLen := len(p)
 
@@ -120,7 +120,7 @@ func (digest *sm3Digest) Write(p []byte) (n int, err error) {
 	return
 }
 
-func (digest *sm3Digest) finish() {
+func (digest *Sm3Digest) finish() {
 	bitLength := digest.byteCount << 3
 
 	digest.Write([]byte{128})
@@ -134,7 +134,7 @@ func (digest *sm3Digest) finish() {
 	digest.processBlock()
 }
 
-func (digest *sm3Digest) checkSum() [DigestLength]byte {
+func (digest *Sm3Digest) checkSum() [DigestLength]byte {
 	digest.finish()
 	vlen := len(digest.v)
 	var out [DigestLength]byte
@@ -144,7 +144,7 @@ func (digest *sm3Digest) checkSum() [DigestLength]byte {
 	return out
 }
 
-func (digest *sm3Digest) processBlock() {
+func (digest *Sm3Digest) processBlock() {
 	for j := 0; j < 16; j++ {
 		digest.w[j] = digest.inWords[j]
 	}
@@ -215,7 +215,7 @@ func (digest *sm3Digest) processBlock() {
 	digest.xOff = 0
 }
 
-func (digest *sm3Digest) processWord(in []byte, inOff int32) {
+func (digest *Sm3Digest) processWord(in []byte, inOff int32) {
 	n := binary.BigEndian.Uint32(in[inOff : inOff+4])
 
 	digest.inWords[digest.xOff] = n
@@ -226,7 +226,7 @@ func (digest *sm3Digest) processWord(in []byte, inOff int32) {
 	}
 }
 
-func (digest *sm3Digest) processLength(bitLength int64) {
+func (digest *Sm3Digest) processLength(bitLength int64) {
 	if digest.xOff > (BlockSize - 2) {
 		digest.inWords[digest.xOff] = 0
 		digest.xOff++
@@ -273,7 +273,7 @@ func gg1(x uint32, y uint32, z uint32) uint32 {
 }
 
 func Sum(data []byte) [DigestLength]byte {
-	var d sm3Digest
+	var d Sm3Digest
 	d.Reset()
 	d.Write(data)
 	return d.checkSum()
