@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/ZZMarquis/gm/sm3"
-	"github.com/ZZMarquis/gm/util"
+	"github.com/taiyuechain/taiyuechain/crypto/gm/sm3"
+	"github.com/taiyuechain/taiyuechain/crypto/gm/util"
+
 	"hash"
 	"math/big"
 )
@@ -25,13 +26,13 @@ func reduce(x *big.Int, w int) *big.Int {
 	return result
 }
 
-func calculateU(w int, selfStaticPriv *PrivateKey, selfEphemeralPriv *PrivateKey, selfEphemeralPub *PublicKey,
-	otherStaticPub *PublicKey, otherEphemeralPub *PublicKey) (x *big.Int, y *big.Int) {
+func calculateU(w int, selfStaticPriv *SmPrivateKey, selfEphemeralPriv *SmPrivateKey, selfEphemeralPub *SmPublicKey,
+	otherStaticPub *SmPublicKey, otherEphemeralPub *SmPublicKey) (x *big.Int, y *big.Int) {
 	x1 := reduce(selfEphemeralPub.X, w)
 	x2 := reduce(otherEphemeralPub.X, w)
 	tA := util.Mul(x1, selfEphemeralPriv.D)
 	tA = util.Add(selfStaticPriv.D, tA)
-	k1 := util.Mul(sm2H, tA)
+	k1 := util.Mul(Sm2H, tA)
 	k1 = util.Mod(k1, selfStaticPriv.Curve.N)
 	k2 := util.Mul(k1, x2)
 	k2 = util.Mod(k2, selfStaticPriv.Curve.N)
@@ -103,8 +104,8 @@ func s2(digest hash.Hash, uy *big.Int, innerHash []byte) []byte {
 }
 
 func CalculateKeyWithConfirmation(initiator bool, keyBits int, confirmationTag []byte,
-	selfStaticPriv *PrivateKey, selfEphemeralPriv *PrivateKey, selfId []byte,
-	otherStaticPub *PublicKey, otherEphemeralPub *PublicKey, otherId []byte) (*ExchangeResult, error) {
+	selfStaticPriv *SmPrivateKey, selfEphemeralPriv *SmPrivateKey, selfId []byte,
+	otherStaticPub *SmPublicKey, otherEphemeralPub *SmPublicKey, otherId []byte) (*ExchangeResult, error) {
 	if selfId == nil {
 		selfId = make([]byte, 0)
 	}
