@@ -68,7 +68,7 @@ func (k KeySizeError) Error() string {
 	return "sm4: invalid key size " + strconv.Itoa(int(k))
 }
 
-type sm4Cipher struct {
+type Sm4Cipher struct {
 	enc []uint32
 	dec []uint32
 }
@@ -78,17 +78,17 @@ func NewCipher(key []byte) (cipher.Block, error) {
 	if n != KeySize {
 		return nil, KeySizeError(n)
 	}
-	c := new(sm4Cipher)
+	c := new(Sm4Cipher)
 	c.enc = expandKey(key, true)
 	c.dec = expandKey(key, false)
 	return c, nil
 }
 
-func (c *sm4Cipher) BlockSize() int {
+func (c *Sm4Cipher) BlockSize() int {
 	return BlockSize
 }
 
-func (c *sm4Cipher) Encrypt(dst, src []byte) {
+func (c *Sm4Cipher) Encrypt(dst, src []byte) {
 	if len(src) < BlockSize {
 		panic("sm4: input not full block")
 	}
@@ -98,7 +98,7 @@ func (c *sm4Cipher) Encrypt(dst, src []byte) {
 	processBlock(c.enc, src, dst)
 }
 
-func (c *sm4Cipher) Decrypt(dst, src []byte) {
+func (c *Sm4Cipher) Decrypt(dst, src []byte) {
 	if len(src) < BlockSize {
 		panic("sm4: input not full block")
 	}
