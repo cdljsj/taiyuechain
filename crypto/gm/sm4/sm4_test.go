@@ -5,7 +5,7 @@ import (
 	"crypto/cipher"
 	"encoding/hex"
 	"fmt"
-	"github.com/ZZMarquis/gm/util"
+	"github.com/taiyuechain/taiyuechain/crypto/gm/util"
 	"testing"
 )
 
