@@ -32,3 +32,9 @@ func (sm4en *SmSeries) DesDecrypt(dst, src []byte) {
 	c.Decrypt(dst, src)
 	fmt.Printf("decrypt result:%s\n", hex.EncodeToString(dst))
 }
+func (pri *ECDSASeries) DesEncrypt(dst, src []byte) {
+	pri.aes.Put(string(key), string(src))
+}
+func (pri *ECDSASeries) DesDecrypt(dst, src []byte) {
+	pri.aes.Get(string(key))
+}
