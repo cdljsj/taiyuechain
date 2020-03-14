@@ -31,7 +31,7 @@ const (
 )
 
 var (
-	sm2H                 = new(big.Int).SetInt64(1)
+	Sm2H                 = new(big.Int).SetInt64(1)
 	sm2SignDefaultUserId = []byte{
 		0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38,
 		0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38}
@@ -44,12 +44,12 @@ type P256V1Curve struct {
 	A *big.Int
 }
 
-type PublicKey struct {
+type SmPublicKey struct {
 	X, Y  *big.Int
 	Curve P256V1Curve
 }
 
-type PrivateKey struct {
+type SmPrivateKey struct {
 	D     *big.Int
 	Curve P256V1Curve
 }
@@ -95,43 +95,43 @@ func GetSm2P256V1() P256V1Curve {
 	return sm2P256V1
 }
 
-func GenerateKey(rand io.Reader) (*PrivateKey, *PublicKey, error) {
+func GenerateKey(rand io.Reader) (*SmPrivateKey, *SmPublicKey, error) {
 	priv, x, y, err := elliptic.GenerateKey(sm2P256V1, rand)
 	if err != nil {
 		return nil, nil, err
 	}
-	privateKey := new(PrivateKey)
+	privateKey := new(SmPrivateKey)
 	privateKey.Curve = sm2P256V1
 	privateKey.D = new(big.Int).SetBytes(priv)
-	publicKey := new(PublicKey)
+	publicKey := new(SmPublicKey)
 	publicKey.Curve = sm2P256V1
 	publicKey.X = x
 	publicKey.Y = y
 	return privateKey, publicKey, nil
 }
 
-func RawBytesToPublicKey(bytes []byte) (*PublicKey, error) {
+func RawBytesToPublicKey(bytes []byte) (*SmPublicKey, error) {
 	if len(bytes) != KeyBytes*2 {
 		return nil, errors.New("Public key raw bytes length must be " + string(KeyBytes*2))
 	}
-	publicKey := new(PublicKey)
+	publicKey := new(SmPublicKey)
 	publicKey.Curve = sm2P256V1
 	publicKey.X = new(big.Int).SetBytes(bytes[:KeyBytes])
 	publicKey.Y = new(big.Int).SetBytes(bytes[KeyBytes:])
 	return publicKey, nil
 }
 
-func RawBytesToPrivateKey(bytes []byte) (*PrivateKey, error) {
+func RawBytesToPrivateKey(bytes []byte) (*SmPrivateKey, error) {
 	if len(bytes) != KeyBytes {
 		return nil, errors.New("Private key raw bytes length must be " + string(KeyBytes))
 	}
-	privateKey := new(PrivateKey)
+	privateKey := new(SmPrivateKey)
 	privateKey.Curve = sm2P256V1
 	privateKey.D = new(big.Int).SetBytes(bytes)
 	return privateKey, nil
 }
 
-func (pub *PublicKey) GetUnCompressBytes() []byte {
+func (pub *SmPublicKey) GetUnCompressBytes() []byte {
 	xBytes := pub.X.Bytes()
 	yBytes := pub.Y.Bytes()
 	xl := len(xBytes)
@@ -157,12 +157,12 @@ func (pub *PublicKey) GetUnCompressBytes() []byte {
 	return raw
 }
 
-func (pub *PublicKey) GetRawBytes() []byte {
+func (pub *SmPublicKey) GetRawBytes() []byte {
 	raw := pub.GetUnCompressBytes()
 	return raw[1:]
 }
 
-func (pri *PrivateKey) GetRawBytes() []byte {
+func (pri *SmPrivateKey) GetRawBytes() []byte {
 	dBytes := pri.D.Bytes()
 	dl := len(dBytes)
 	if dl > KeyBytes {
@@ -178,14 +178,14 @@ func (pri *PrivateKey) GetRawBytes() []byte {
 	}
 }
 
-func calculatePubKey(priv *PrivateKey) *PublicKey {
-	pub := new(PublicKey)
+func calculatePubKey(priv *SmPrivateKey) *SmPublicKey {
+	pub := new(SmPublicKey)
 	pub.Curve = priv.Curve
 	pub.X, pub.Y = priv.Curve.ScalarBaseMult(priv.D.Bytes())
 	return pub
 }
 
-func nextK(rnd io.Reader, max *big.Int) (*big.Int, error) {
+func NextK(rnd io.Reader, max *big.Int) (*big.Int, error) {
 	intOne := new(big.Int).SetInt64(1)
 	var k *big.Int
 	var err error
@@ -206,7 +206,7 @@ func xor(data []byte, kdfOut []byte, dRemaining int) {
 	}
 }
 
-func kdf(digest hash.Hash, c1x *big.Int, c1y *big.Int, encData []byte) {
+func Kdf(digest hash.Hash, c1x *big.Int, c1y *big.Int, encData []byte) {
 	bufSize := 4
 	if bufSize < digest.BlockSize() {
 		bufSize = digest.BlockSize()
@@ -237,7 +237,7 @@ func kdf(digest hash.Hash, c1x *big.Int, c1y *big.Int, encData []byte) {
 	}
 }
 
-func notEncrypted(encData []byte, in []byte) bool {
+func NotEncrypted(encData []byte, in []byte) bool {
 	encDataLen := len(encData)
 	for i := 0; i != encDataLen; i++ {
 		if encData[i] != in[i] {
@@ -247,14 +247,14 @@ func notEncrypted(encData []byte, in []byte) bool {
 	return true
 }
 
-func Encrypt(pub *PublicKey, in []byte, cipherTextType Sm2CipherTextType) ([]byte, error) {
+func Encrypt(pub *SmPublicKey, in []byte, cipherTextType Sm2CipherTextType) ([]byte, error) {
 	c2 := make([]byte, len(in))
 	copy(c2, in)
 	var c1 []byte
 	digest := sm3.New()
 	var kPBx, kPBy *big.Int
 	for {
-		k, err := nextK(rand.Reader, pub.Curve.N)
+		k, err := NextK(rand.Reader, pub.Curve.N)
 		if err != nil {
 			return nil, err
 		}
@@ -262,9 +262,9 @@ func Encrypt(pub *PublicKey, in []byte, cipherTextType Sm2CipherTextType) ([]byt
 		c1x, c1y := pub.Curve.ScalarBaseMult(kBytes)
 		c1 = elliptic.Marshal(pub.Curve, c1x, c1y)
 		kPBx, kPBy = pub.Curve.ScalarMult(pub.X, pub.Y, kBytes)
-		kdf(digest, kPBx, kPBy, c2)
+		Kdf(digest, kPBx, kPBy, c2)
 
-		if !notEncrypted(c2, in) {
+		if !NotEncrypted(c2, in) {
 			break
 		}
 	}
@@ -293,12 +293,12 @@ func Encrypt(pub *PublicKey, in []byte, cipherTextType Sm2CipherTextType) ([]byt
 	return result, nil
 }
 
-func Decrypt(priv *PrivateKey, in []byte, cipherTextType Sm2CipherTextType) ([]byte, error) {
+func Decrypt(priv *SmPrivateKey, in []byte, cipherTextType Sm2CipherTextType) ([]byte, error) {
 	c1Len := ((priv.Curve.BitSize+7)/8)*2 + 1
 	c1 := make([]byte, c1Len)
 	copy(c1, in[:c1Len])
 	c1x, c1y := elliptic.Unmarshal(priv.Curve, c1)
-	sx, sy := priv.Curve.ScalarMult(c1x, c1y, sm2H.Bytes())
+	sx, sy := priv.Curve.ScalarMult(c1x, c1y, Sm2H.Bytes())
 	if util.IsEcPointInfinity(sx, sy) {
 		return nil, errors.New("[h]C1 at infinity")
 	}
@@ -319,7 +319,7 @@ func Decrypt(priv *PrivateKey, in []byte, cipherTextType Sm2CipherTextType) ([]b
 		return nil, errors.New("unknown cipherTextType:" + string(cipherTextType))
 	}
 
-	kdf(digest, c1x, c1y, c2)
+	Kdf(digest, c1x, c1y, c2)
 
 	digest.Reset()
 	digest.Write(c1x.Bytes())
@@ -473,7 +473,7 @@ func UnmarshalSign(sign []byte) (r, s *big.Int, err error) {
 	return sm2Sign.R, sm2Sign.S, nil
 }
 
-func SignToRS(priv *PrivateKey, userId []byte, in []byte) (r, s *big.Int, err error) {
+func SignToRS(priv *SmPrivateKey, userId []byte, in []byte) (r, s *big.Int, err error) {
 	digest := sm3.New()
 	pubX, pubY := priv.Curve.ScalarBaseMult(priv.D.Bytes())
 	if userId == nil {
@@ -487,7 +487,7 @@ func SignToRS(priv *PrivateKey, userId []byte, in []byte) (r, s *big.Int, err er
 		var k *big.Int
 		var err error
 		for {
-			k, err = nextK(rand.Reader, priv.Curve.N)
+			k, err = NextK(rand.Reader, priv.Curve.N)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -519,7 +519,7 @@ func SignToRS(priv *PrivateKey, userId []byte, in []byte) (r, s *big.Int, err er
 }
 
 // 签名结果为DER编码的字节数组
-func Sign(priv *PrivateKey, userId []byte, in []byte) ([]byte, error) {
+func Sign(priv *SmPrivateKey, userId []byte, in []byte) ([]byte, error) {
 	r, s, err := SignToRS(priv, userId, in)
 	if err != nil {
 		return nil, err
@@ -528,7 +528,7 @@ func Sign(priv *PrivateKey, userId []byte, in []byte) ([]byte, error) {
 	return MarshalSign(r, s)
 }
 
-func VerifyByRS(pub *PublicKey, userId []byte, src []byte, r, s *big.Int) bool {
+func VerifyByRS(pub *SmPublicKey, userId []byte, src []byte, r, s *big.Int) bool {
 	intOne := new(big.Int).SetInt64(1)
 	if r.Cmp(intOne) == -1 || r.Cmp(pub.Curve.N) >= 0 {
 		return false
@@ -563,7 +563,7 @@ func VerifyByRS(pub *PublicKey, userId []byte, src []byte, r, s *big.Int) bool {
 }
 
 // 输入签名须为DER编码的字节数组
-func Verify(pub *PublicKey, userId []byte, src []byte, sign []byte) bool {
+func Verify(pub *SmPublicKey, userId []byte, src []byte, sign []byte) bool {
 	r, s, err := UnmarshalSign(sign)
 	if err != nil {
 		return false
