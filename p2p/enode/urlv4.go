@@ -18,10 +18,10 @@ package enode
 
 import (
 	"crypto/ecdsa"
-	"encoding/hex"
+	//"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/taiyuechain/taiyuechain/crypto/gm/sm2"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/taiyuechain/taiyuechain/crypto/taiCrypto"
 	"net"
 	"net/url"
@@ -29,7 +29,7 @@ import (
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/common/math"
-	//"github.com/taiyuechain/taiyuechain/crypto"
+	"github.com/taiyuechain/taiyuechain/crypto"
 	"github.com/taiyuechain/taiyuechain/p2p/enr"
 )
 
@@ -108,6 +108,7 @@ func parseComplete(rawurl string) (*Node, error) {
 		ip               net.IP
 		tcpPort, udpPort uint64
 	)
+	//fmt.Println(id.Publickey)
 	u, err := url.Parse(rawurl)
 	if err != nil {
 		return nil, err
@@ -153,16 +154,17 @@ func parseComplete(rawurl string) (*Node, error) {
 //func parsePubkey(in string) (*ecdsa.PublicKey, error) {
 func parsePubkey(in string) (*taiCrypto.TaiPublicKey, error) {
 	var taipublic taiCrypto.TaiPublicKey
-	b, err := hex.DecodeString(in)
+
+	b, err := hexutil.Decode(in)
 	if err != nil {
 		return nil, err
-	} else if len(b) != 64 {
+	} else if len(b) != 65 {
 		return nil, fmt.Errorf("wrong length, want %d hex chars", 128)
 	}
-	b = append([]byte{0x4}, b...)
+	//b = append([]byte{0x04}, b...)
 	//caoliang modify
 	//return crypto.UnmarshalPubkey(b)
-	taiCrypto.AsymmetricCryptoType = taiCrypto.ASYMMETRICCRYPTOECDSA
+	//taiCrypto.AsymmetricCryptoType = taiCrypto.ASYMMETRICCRYPTOECDSA
 	public, err := taipublic.UnmarshalPubkey(b)
 	if err != nil {
 		return nil, nil
@@ -174,19 +176,19 @@ func (n *Node) v4URL() string {
 	var (
 		scheme enr.ID
 		nodeid string
-		//key       ecdsa.PublicKey
-		key       taiCrypto.TaiPublicKey
-		taipublic taiCrypto.TaiPublicKey
+		key       ecdsa.PublicKey
+		//key       taiCrypto.TaiPublicKey
+		//taipublic taiCrypto.TaiPublicKey
 	)
 	n.Load(&scheme)
-	n.Load((*Secp256k1)(&key))
+	n.Load((*EcdsaSecp256k1)(&key))
 	switch {
-	//case scheme == "v4" || key != ecdsa.PublicKey{}:
-	case scheme == "v4" || key.Publickey != ecdsa.PublicKey{} || key.SmPublickey != sm2.PublicKey{}:
+	case scheme == "v4" || key != ecdsa.PublicKey{}:
+	//case scheme == "v4" || key.Publickey != ecdsa.PublicKey{} || key.SmPublickey != sm2.PublicKey{}:
 		//caoliang modify
 		//nodeid = fmt.Sprintf("%x", crypto.FromECDSAPub(&key)[1:])
-		taipublic = key
-		nodeid = fmt.Sprintf("%x", taipublic.FromECDSAPub(taipublic)[1:])
+		//taipublic = key
+		nodeid = fmt.Sprintf("%x", crypto.FromECDSAPubCA(&key)[1:])
 	default:
 		nodeid = fmt.Sprintf("%s.%x", scheme, n.id[:])
 	}
