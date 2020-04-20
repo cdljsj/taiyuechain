@@ -6,11 +6,10 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
-	"encoding/pem"
+	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/taiyuechain/taiyuechain/crypto"
-	"github.com/taiyuechain/taiyuechain/crypto/taiCrypto"
 	"log"
 	"math/big"
 	"os"
@@ -18,6 +17,7 @@ import (
 
 	"crypto/elliptic"
 	"io/ioutil"
+	"encoding/pem"
 )
 
 func GetIdentityFromByte(idBytes []byte) (Identity, error) {
@@ -63,7 +63,7 @@ func GetCertFromPem(idBytes []byte) (*x509.Certificate, error) {
 }
 
 func CreateIdentity(priv string) bool {
-	var private taiCrypto.TaiPrivateKey
+	//var private taiCrypto.TaiPrivateKey
 	//var public taiCrypto.TaiPublicKey
 	ca := &x509.Certificate{
 		SerialNumber: big.NewInt(1653),
@@ -83,12 +83,12 @@ func CreateIdentity(priv string) bool {
 	//ecdsa, err := taiCrypto.HexToTaiPrivateKey(priv)
 	//var thash taiCrypto.THash
 	//caecda, err := private.ToECDSACA(ecdsa.HexBytesPrivate)
-	caecda, err := private.ToECDSACA([]byte(priv))
+	caecda, err := crypto.ToECDSA([]byte(priv))
 	if err != nil {
 		log.Println("create ca failed", err)
 		return false
 	}
-	ca_b, err := x509.CreateCertificate(rand.Reader, ca, ca, &caecda.Private.PublicKey, &caecda.Private)
+	ca_b, err := x509.CreateCertificate(rand.Reader, ca, ca, &caecda.PublicKey, &caecda)
 	if err != nil {
 		log.Println("create ca failed", err)
 		return false
@@ -102,7 +102,7 @@ func CreateIdentity(priv string) bool {
 		return false
 	}
 	defer dstFile.Close()
-	priv_b, _ := x509.MarshalECPrivateKey(&caecda.Private)
+	priv_b, _ := x509.MarshalECPrivateKey(caecda)
 	encodeString1 := base64.StdEncoding.EncodeToString(priv_b)
 	if err != nil {
 		fmt.Println(err)
@@ -116,6 +116,38 @@ func CreateIdentity(priv string) bool {
 	dstFile1.WriteString(encodeString1 + "\n")
 	fmt.Println(encodeString)
 	return true
+}
+
+func CreateCertP256(priv *ecdsa.PrivateKey)( cert []byte)  {
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	ca := &x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			Country:            []string{"China"},
+			Organization:       []string{"Yjwt"},
+			OrganizationalUnit: []string{"YjwtU"},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().AddDate(10, 0, 0),
+		SubjectKeyId:          []byte{1, 2, 3, 4, 5},
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+	}
+	//ecdsa, err := taiCrypto.HexToTaiPrivateKey(priv)
+	//var thash taiCrypto.THash
+	//caecda, err := private.ToECDSACA(ecdsa.HexBytesPrivate)
+	//caecda, err := private.ToECDSACA([]byte(priv))
+	//pub := crypto.FromECDSAPub(&priv.PublicKey)
+	ca_b, err := x509.CreateCertificate(rand.Reader, ca, ca, &priv.PublicKey, priv)
+	if err != nil {
+		log.Println("create ca failed", err)
+		return nil
+	}
+	cert = ca_b
+	return cert;
 }
 
 func CreateIdentity2(priv, priv2 *ecdsa.PrivateKey, name string) bool {
@@ -195,12 +227,14 @@ func CreateIdentity2(priv, priv2 *ecdsa.PrivateKey, name string) bool {
 	}*/
 
 	encodeString := base64.StdEncoding.EncodeToString(ca_b)
-	fileName := "./testdata/testcert/" + name + "ca.pem"
+	//fileName := "../../crypto/taiCrypto/data/cert/ecdsacert/" + name + "ca.pem"
+	fileName := "../../accounts/keystore/testdata/" + name + "ca.pem"
 	dstFile, err := os.Create(fileName)
 	if err != nil {
 		return false
 	}
-	dstFile.WriteString(encodeString + "\n")
+	//dstFile.WriteString(encodeString + "\n")
+	dstFile.WriteString(encodeString )
 	defer dstFile.Close()
 	/*
 		priv_b, _ := x509.MarshalECPrivateKey(priv)
@@ -219,12 +253,12 @@ func CreateIdentity2(priv, priv2 *ecdsa.PrivateKey, name string) bool {
 	return true
 }
 
-func VarifyCertByPrivateKey(priv *ecdsa.PrivateKey, cert []byte) error {
+func VarifyCertByPubKey(pubkey *ecdsa.PublicKey, cert []byte) error {
 	if cert == nil {
 		return errors.New("cert is nil")
 	}
-	if priv == nil {
-		return errors.New("priv is nil")
+	if pubkey == nil {
+		return errors.New("pubkey is nil")
 	}
 
 	bytes, _ := base64.StdEncoding.DecodeString(string(cert))
@@ -240,7 +274,7 @@ func VarifyCertByPrivateKey(priv *ecdsa.PrivateKey, cert []byte) error {
 		publicKeyBytes = elliptic.Marshal(pub2.Curve, pub2.X, pub2.Y)
 	}
 
-	if string(publicKeyBytes) == string(crypto.FromECDSAPub(&priv.PublicKey)) {
+	if string(publicKeyBytes) == string(crypto.FromECDSAPub(pubkey)) {
 		return nil
 	} else {
 		return errors.New("cert pubk not same with cert")
@@ -248,11 +282,32 @@ func VarifyCertByPrivateKey(priv *ecdsa.PrivateKey, cert []byte) error {
 
 }
 
+type Configuration struct {
+	Enabled   bool
+	EcdsaPath string
+	GmPath    string
+}
+
 func ReadPemFileByPath(path string) ([]byte, error) {
+	file, _ := os.Open("../../crypto/taiCrypto/data/config/conf.json")
+	defer file.Close()
+	decoder := json.NewDecoder(file)
+	conf := Configuration{}
+	err := decoder.Decode(&conf)
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+	fmt.Println(conf.EcdsaPath)
+
 	if len(path) == 0 {
 		return nil, errors.New("ReadPemFileByPath path is nil")
 	}
 	//data, err := ioutil.ReadFile(path)
-	return ioutil.ReadFile(path)
+	return ioutil.ReadFile(conf.EcdsaPath + path)
+}
 
+func ReadPemFileUsePath(path string) ([]byte, error) {
+
+
+	return ioutil.ReadFile(path)
 }
