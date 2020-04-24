@@ -150,6 +150,7 @@ func (s *dialstate) addStatic(n *enode.Node) {
 	// This overwrites the task instead of updating an existing
 	// entry, giving users the opportunity to force a resolve operation.
 	s.static[n.ID()] = &dialTask{flags: staticDialedConn, dest: n}
+	log.Trace("n.Id is", n.ID(), n.Pubkey())
 }
 
 func (s *dialstate) removeStatic(n *enode.Node) {
@@ -164,7 +165,6 @@ func (s *dialstate) newTasks(nRunning int, peers map[enode.ID]*Peer, now time.Ti
 	if s.start.IsZero() {
 		s.start = now
 	}
-
 	var newtasks []task
 	addDial := func(flag connFlag, n *enode.Node) bool {
 		if err := s.checkDial(n, peers); err != nil {
@@ -212,7 +212,6 @@ func (s *dialstate) newTasks(nRunning int, peers map[enode.ID]*Peer, now time.Ti
 		bootnode := s.bootnodes[0]
 		s.bootnodes = append(s.bootnodes[:0], s.bootnodes[1:]...)
 		s.bootnodes = append(s.bootnodes, bootnode)
-
 		if addDial(dynDialedConn, bootnode) {
 			needDynDials--
 		}
@@ -253,6 +252,7 @@ func (s *dialstate) newTasks(nRunning int, peers map[enode.ID]*Peer, now time.Ti
 		t := &waitExpireTask{s.hist.min().exp.Sub(now)}
 		newtasks = append(newtasks, t)
 	}
+	log.Trace("newtasks is length:", len(newtasks))
 	return newtasks
 }
 
@@ -272,6 +272,7 @@ func (s *dialstate) checkDial(n *enode.Node, peers map[enode.ID]*Peer) error {
 	case peers[n.ID()] != nil:
 		return errAlreadyConnected
 	case n.ID() == s.self:
+		log.Trace("publickey is self")
 		return errSelf
 	case s.netrestrict != nil && !s.netrestrict.Contains(n.IP()):
 		return errNotWhitelisted

@@ -20,7 +20,6 @@ package p2p
 import (
 	"bytes"
 	"crypto/ecdsa"
-
 	//"crypto/ecdsa"
 	"encoding/hex"
 	"errors"
@@ -326,6 +325,7 @@ func (srv *Server) PeerCount() int {
 func (srv *Server) AddPeer(node *enode.Node) {
 	select {
 	case srv.addstatic <- node:
+		log.Trace("addstaic node is :", node.Pubkey(), node)
 	case <-srv.quit:
 	}
 }
@@ -785,7 +785,6 @@ running:
 			}
 		}
 	}
-
 	srv.log.Trace("P2P networking is spinning down")
 
 	// Terminate discovery. If there is a running lookup it will terminate soon.
@@ -929,16 +928,18 @@ func (srv *Server) setupConn(c *conn, flags connFlag, dialDest *enode.Node) erro
 		return errServerStopped
 	}
 	// If dialing, figure out the remote public key.
-	var dialPubkey taiCrypto.TaiPublicKey
+	var dialPubkey *taiCrypto.TaiPublicKey
 	if dialDest != nil {
+		dialPubkey = new(taiCrypto.TaiPublicKey)
 		/*pubkey:=new(ecdsa.PublicKey)*/
 		dialPubkey.Publickey = *new(ecdsa.PublicKey)
-		if err := dialDest.Load((*enode.Secp256k1)(&dialPubkey)); err != nil {
+		//if err := dialDest.Load((*enode.Secp256k1)(&dialPubkey)); err != nil {
+		if err := dialDest.Load((*enode.Secp256k1)(&dialPubkey.Publickey)); err != nil {
 			return errors.New("dial destination doesn't have a secp256k1 public key")
 		}
 	}
 	// Run the encryption handshake.
-	remotePubkey, err := c.doEncHandshake(srv.PrivateKey, &dialPubkey)
+	remotePubkey, err := c.doEncHandshake(srv.PrivateKey, dialPubkey)
 	if err != nil {
 		srv.log.Trace("Failed RLPx handshake", "addr", c.fd.RemoteAddr(), "conn", c.flags, "err", err)
 		return err
@@ -995,13 +996,16 @@ func (srv *Server) setupConn(c *conn, flags connFlag, dialDest *enode.Node) erro
 
 //func nodeFromConn(pubkey *ecdsa.PublicKey, conn net.Conn) *enode.Node {
 func nodeFromConn(pubkey *taiCrypto.TaiPublicKey, conn net.Conn) *enode.Node {
+	var taipublic taiCrypto.TaiPublicKey
+	//ecies.Encrypt(rand.Reader, h.remote, buf, nil, nil)
 	var ip net.IP
 	var port int
 	if tcp, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
 		ip = tcp.IP
 		port = tcp.Port
 	}
-	return enode.NewV4(pubkey, ip, port, port)
+	taipublic = *pubkey
+	return enode.NewV4(&taipublic, ip, port, port)
 }
 
 func truncateName(s string) string {

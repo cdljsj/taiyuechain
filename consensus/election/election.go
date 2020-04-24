@@ -42,8 +42,9 @@ import (
 )
 
 const (
-	snailchainHeadSize  = 64
-	committeeCacheLimit = 256
+	snailchainHeadSize      = 64
+	committeeCacheLimit     = 256
+	committeeMemberChanSize = 20
 )
 
 type ElectMode uint
@@ -149,6 +150,9 @@ type Election struct {
 	//snailChainEventCh  chan types.SnailChainEvent
 	//snailChainEventSub event.Subscription
 
+	committeeMemberCh  chan types.CommitteeMemberEvent
+	committeeMemberSub event.Subscription
+
 	fastchain *core.BlockChain
 	//snailchain SnailBlockChain
 
@@ -172,11 +176,14 @@ func NewElection(fastBlockChain *core.BlockChain, config Config) *Election {
 		fastchain: fastBlockChain,
 		//snailchain:        snailBlockChain,
 		//snailChainEventCh: make(chan types.SnailChainEvent, snailchainHeadSize),
-		prepare:      false,
-		switchNext:   make(chan struct{}),
-		singleNode:   config.GetNodeType(),
-		electionMode: ElectModeEtrue,
+		prepare:           false,
+		switchNext:        make(chan struct{}),
+		singleNode:        config.GetNodeType(),
+		electionMode:      ElectModeEtrue,
+		committeeMemberCh: make(chan types.CommitteeMemberEvent, committeeMemberChanSize),
 	}
+	//subscrib handle committeeMember event
+	election.subScribehandleCommitteeMemberEvent()
 
 	// get genesis committee
 	election.genesisCommittee = election.getGenesisCommittee()
@@ -204,6 +211,10 @@ func NewElection(fastBlockChain *core.BlockChain, config Config) *Election {
 	}
 
 	return election
+}
+
+func (election *Election) subScribehandleCommitteeMemberEvent() {
+	//election.committeeMemberSub = election.*.SubscribeCommitteeMemberEvent(election.committeeMemberCh)
 }
 
 // NewFakeElection create fake mode election only for testing
@@ -1365,6 +1376,17 @@ func (e *Election) loop() {
 					BeginFastNumber:  e.committee.beginFastNumber,
 				})
 			}
+		case ch := <-e.committeeMemberCh:
+			switch ch.Option {
+			case types.AddCommitteeMember:
+				log.Info("AddCommitteeMember..", "coinbase", ch.CommitteeMember.Coinbase)
+				e.nextCommittee.members = append(e.nextCommittee.members, ch.CommitteeMember)
+			case types.RemoveCommitteeMember:
+				log.Info("RemoveCommitteeMember..", "coinbase", ch.CommitteeMember.Coinbase)
+				e.removeCommitteeMember(ch.CommitteeMember)
+			default:
+				log.Error("unknown handle committeeMember option:", "option", ch.Option)
+			}
 		}
 	}
 }
@@ -1372,6 +1394,19 @@ func (e *Election) loop() {
 // SubscribeElectionEvent adds a channel to feed on committee change event
 func (e *Election) SubscribeElectionEvent(ch chan<- types.ElectionEvent) event.Subscription {
 	return e.scope.Track(e.electionFeed.Subscribe(ch))
+}
+
+func (e *Election) removeCommitteeMember(removeCommitteeMember *types.CommitteeMember) {
+	for i, member := range e.nextCommittee.members {
+		if member.Coinbase == removeCommitteeMember.Coinbase {
+			e.nextCommittee.members = append(e.nextCommittee.members[:i], e.nextCommittee.members[i+1:]...)
+		}
+	}
+}
+
+func main() {
+	a := []int{1, 2, 3}
+	a = append(a[:0], a[1:]...) // 删除开头1个元素
 }
 
 // SetEngine set election backend consesus

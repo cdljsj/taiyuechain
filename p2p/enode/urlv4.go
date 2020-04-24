@@ -162,7 +162,7 @@ func parsePubkey(in string) (*taiCrypto.TaiPublicKey, error) {
 	} else if len(b) != 64 {
 		return nil, fmt.Errorf("wrong length, want %d hex chars", 128)
 	}
-	b = append([]byte{0x04}, b...)
+	b = append([]byte{0x4}, b...)
 	public, err := taipublic.UnmarshalPubkey(b)
 	if err != nil {
 		return nil, nil
@@ -179,7 +179,7 @@ func (n *Node) v4URL() string {
 		//taipublic taiCrypto.TaiPublicKey
 	)
 	n.Load(&scheme)
-	n.Load((*EcdsaSecp256k1)(&key))
+	n.Load((*Secp256k1)(&key))
 	switch {
 	case scheme == "v4" || key != ecdsa.PublicKey{}:
 		//case scheme == "v4" || key.Publickey != ecdsa.PublicKey{} || key.SmPublickey != sm2.PublicKey{}:

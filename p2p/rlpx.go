@@ -20,7 +20,9 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
-	//"crypto/ecdsa"
+	/*	"crypto/ecdsa"
+		"github.com/taiyuechain/taiyuechain/crypto"
+		"github.com/taiyuechain/taiyuechain/crypto/ecies"*/
 	"github.com/taiyuechain/taiyuechain/crypto/taiCrypto"
 
 	//"crypto/ecdsa"
@@ -219,7 +221,7 @@ type encHandshake struct {
 // secrets represents the connection secrets
 // which are negotiated during the encryption handshake.
 type secrets struct {
-	//Remote                *ecies.PublicKey
+	//Remote *ecies.PublicKey
 	Remote                *taiCrypto.TaiPublicKey
 	AES, MAC              []byte
 	EgressMAC, IngressMAC hash.Hash
@@ -294,6 +296,7 @@ func (h *encHandshake) secrets(auth, authResp []byte) (secrets, error) {
 /*func (h *encHandshake) staticSharedSecret(prv *ecdsa.PrivateKey) ([]byte, error) {
 	return ecies.ImportECDSA(prv).GenerateShared(h.remote, sskLen, sskLen)
 }*/
+
 func (h *encHandshake) staticSharedSecret(prv *taiCrypto.TaiPrivateKey) ([]byte, error) {
 	var taiprivate taiCrypto.TaiPrivateKey
 	return taiprivate.ImportECDSA(prv).GenerateShared(h.remote, sskLen, sskLen)
@@ -305,10 +308,10 @@ func (h *encHandshake) staticSharedSecret(prv *taiCrypto.TaiPrivateKey) ([]byte,
 // prv is the local client's private key.
 //func initiatorEncHandshake(conn io.ReadWriter, prv *ecdsa.PrivateKey, remote *ecdsa.PublicKey) (s secrets, err error) {
 func initiatorEncHandshake(conn io.ReadWriter, prv *taiCrypto.TaiPrivateKey, remote *taiCrypto.TaiPublicKey) (s secrets, err error) {
-	//h := &encHandshake{initiator: true, remote: ecies.ImportECDSAPublic(&remote.Publickey)}
+	//h := &encHandshake{initiator: true, remote: ecies.ImportECDSAPublic(remote)}
 	h := &encHandshake{initiator: true, remote: remote.ImportECDSAPublic(remote)}
-	//authMsg, err := h.makeAuthMsg(prv)
 	authMsg, err := h.makeAuthMsg(prv)
+	//authMsg, err := h.makeAuthMsg(prv)
 	if err != nil {
 		return s, err
 	}
@@ -537,8 +540,10 @@ func readHandshakeMsg(msg plainDecoder, plainSize int, prv *taiCrypto.TaiPrivate
 		return buf, err
 	}
 	// Attempt decoding pre-EIP-8 "plain" format.
+	log.Debug("decrypt is key is:", prv)
 	//key := ecies.ImportECDSA(prv)
 	key := prv.ImportECDSA(prv)
+	log.Debug("decrypt is buf is:", buf)
 	if dec, err := key.Decrypt(buf, nil, nil); err == nil {
 		msg.decodePlain(dec)
 		return buf, nil
@@ -584,6 +589,7 @@ func importPublicKey(pubKey []byte) (*taiCrypto.TaiPublicKey, error) {
 		return nil, err
 	}
 	return taipublic.ImportECDSAPublic(pub), nil
+	//return ecies.ImportECDSAPublic(pub), nil
 }
 
 //func exportPubkey(pub *ecies.PublicKey) []byte {
@@ -591,6 +597,9 @@ func exportPubkey(pub *taiCrypto.TaiPublicKey) []byte {
 	if pub == nil {
 		panic("nil pubkey")
 	}
+	/*if pub.X != nil {
+		return elliptic.Marshal(pub.Curve, pub.X, pub.Y)[1:]
+	}*/
 	if pub.EciesPublickey.X != nil {
 		return elliptic.Marshal(pub.EciesPublickey.Curve, pub.EciesPublickey.X, pub.EciesPublickey.Y)[1:]
 	}
